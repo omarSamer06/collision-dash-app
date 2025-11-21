@@ -44,21 +44,41 @@ def normalize_vehicle(v):
 
     return "OTHER"
 
-# Clean data
 df["VEHICLE_CATEGORY"] = df["VEHICLE TYPE CODE 1"].apply(normalize_vehicle)
 
+# ======================
 # Dropdown options
-borough_options = [{"label": b.title(), "value": b} for b in sorted(df["BOROUGH"].dropna().unique())]
-year_options = [{"label": str(int(y)), "value": int(y)} for y in sorted(df["YEAR"].dropna().unique())]
-vehicle_options = [{"label": v, "value": v} for v in sorted(df["VEHICLE_CATEGORY"].dropna().unique())]
-factor_options = [{"label": f.title(), "value": f} for f in sorted(df["CONTRIBUTING FACTOR VEHICLE 1"].dropna().unique())]
-injury_type_options = [{"label": i.title(), "value": i} for i in sorted(df["INJURY_TYPE"].dropna().unique())]
+# ======================
+borough_options = [
+    {"label": b.title(), "value": b}
+    for b in sorted(df["BOROUGH"].dropna().unique())
+]
+
+year_options = [
+    {"label": str(int(y)), "value": int(y)}
+    for y in sorted(df["YEAR"].dropna().unique())
+]
+
+vehicle_options = [
+    {"label": v, "value": v}
+    for v in sorted(df["VEHICLE_CATEGORY"].dropna().unique())
+]
+
+factor_options = [
+    {"label": f.title(), "value": f}
+    for f in sorted(df["CONTRIBUTING FACTOR VEHICLE 1"].dropna().unique())
+]
+
+injury_type_options = [
+    {"label": i.title(), "value": i}
+    for i in sorted(df["INJURY_TYPE"].dropna().unique())
+]
 
 # ======================
-# Build Dash app
+# Dash App
 # ======================
 app = Dash(__name__)
-server = app.server     # <-- VERY IMPORTANT FOR DEPLOYMENT
+server = app.server   # VERY IMPORTANT FOR RAILWAY + GUNICORN
 
 app.layout = html.Div(
     style={"fontFamily": "Arial", "padding": "20px"},
@@ -68,11 +88,16 @@ app.layout = html.Div(
         html.Div(
             style={"display": "flex", "gap": "10px", "flexWrap": "wrap"},
             children=[
-                dcc.Dropdown(id="filter-borough", options=borough_options, placeholder="Select Borough", multi=True, style={"width": "200px"}),
-                dcc.Dropdown(id="filter-year", options=year_options, placeholder="Select Year", multi=True, style={"width": "150px"}),
-                dcc.Dropdown(id="filter-vehicle", options=vehicle_options, placeholder="Vehicle Type", multi=True, style={"width": "200px"}),
-                dcc.Dropdown(id="filter-factor", options=factor_options, placeholder="Contributing Factor", multi=True, style={"width": "250px"}),
-                dcc.Dropdown(id="filter-injury", options=injury_type_options, placeholder="Injury Type", multi=True, style={"width": "220px"}),
+                dcc.Dropdown(id="filter-borough", options=borough_options,
+                             placeholder="Select Borough", multi=True, style={"width": "200px"}),
+                dcc.Dropdown(id="filter-year", options=year_options,
+                             placeholder="Select Year", multi=True, style={"width": "150px"}),
+                dcc.Dropdown(id="filter-vehicle", options=vehicle_options,
+                             placeholder="Vehicle Type", multi=True, style={"width": "200px"}),
+                dcc.Dropdown(id="filter-factor", options=factor_options,
+                             placeholder="Contributing Factor", multi=True, style={"width": "250px"}),
+                dcc.Dropdown(id="filter-injury", options=injury_type_options,
+                             placeholder="Injury Type", multi=True, style={"width": "220px"}),
             ],
         ),
 
@@ -81,13 +106,15 @@ app.layout = html.Div(
         html.Div(
             style={"display": "flex", "gap": "10px"},
             children=[
-                dcc.Input(id="search-box", type="text", placeholder="Search (e.g. 'Brooklyn 2022 pedestrian crashes')", style={"width": "400px"}),
-                html.Button("Generate Report", id="btn-generate", n_clicks=0, style={"padding": "10px 20px", "fontWeight": "bold"}),
+                dcc.Input(id="search-box", type="text",
+                          placeholder="Search crashes...", style={"width": "400px"}),
+                html.Button("Generate Report", id="btn-generate",
+                            n_clicks=0, style={"padding": "10px 20px", "fontWeight": "bold"}),
             ],
         ),
 
         html.Br(),
-        html.Div(id="results-area")
+        html.Div(id="output")
     ],
 )
 
@@ -95,61 +122,49 @@ app.layout = html.Div(
 # Callbacks
 # ======================
 @app.callback(
-    Output("results-area", "children"),
+    Output("output", "children"),
     Input("btn-generate", "n_clicks"),
-    State("filter-borough", "value"),
-    State("filter-year", "value"),
-    State("filter-vehicle", "value"),
-    State("filter-factor", "value"),
-    State("filter-injury", "value"),
-    State("search-box", "value"),
+    [
+        State("filter-borough", "value"),
+        State("filter-year", "value"),
+        State("filter-vehicle", "value"),
+        State("filter-factor", "value"),
+        State("filter-injury", "value"),
+        State("search-box", "value"),
+    ],
 )
-def generate_report(n, boroughs, years, vehicles, factors, injuries, search):
-    if n == 0:
+def update_report(n, borough, year, vehicle, factor, injury, search):
+    if not n:
         return ""
 
-    d = df.copy()
+    filtered = df.copy()
 
-    if boroughs:
-        d = d[d["BOROUGH"].isin(boroughs)]
-    if years:
-        d = d[d["YEAR"].isin(years)]
-    if vehicles:
-        d = d[d["VEHICLE_CATEGORY"].isin(vehicles)]
-    if factors:
-        d = d[d["CONTRIBUTING FACTOR VEHICLE 1"].isin(factors)]
-    if injuries:
-        d = d[d["INJURY_TYPE"].isin(injuries)]
+    if borough:
+        filtered = filtered[filtered["BOROUGH"].isin(borough)]
+    if year:
+        filtered = filtered[filtered["YEAR"].isin(year)]
+    if vehicle:
+        filtered = filtered[filtered["VEHICLE_CATEGORY"].isin(vehicle)]
+    if factor:
+        filtered = filtered[filtered["CONTRIBUTING FACTOR VEHICLE 1"].isin(factor)]
+    if injury:
+        filtered = filtered[filtered["INJURY_TYPE"].isin(injury)]
 
-    # If search used:
-    if search and len(search.strip()) > 0:
-        s = search.lower()
-        d = d[
-            d["BOROUGH"].str.lower().str.contains(s)
-            | d["VEHICLE_CATEGORY"].str.lower().str.contains(s)
-            | d["CONTRIBUTING FACTOR VEHICLE 1"].str.lower().str.contains(s)
-            | d["INJURY_TYPE"].str.lower().str.contains(s)
+    if search:
+        search_lower = search.lower()
+        filtered = filtered[
+            filtered.apply(lambda row: search_lower in str(row).lower(), axis=1)
         ]
 
-    if d.empty:
-        return html.H3("No results match your filters.", style={"color": "red"})
-
     fig = px.histogram(
-        d,
-        x="CRASH_DATETIME",
-        nbins=40,
-        title="Collisions Over Time",
+        filtered, x="CRASH_DATETIME",
+        title="Crashes Over Time", nbins=50
     )
 
-    return html.Div([
-        html.H3(f"Found {len(d)} collisions matching criteria."),
-        dcc.Graph(figure=fig),
-    ])
-
+    return dcc.Graph(figure=fig)
 
 # ======================
-# Main entry point (Railway)
+# Local Debug
 # ======================
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8050))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(debug=True, host="0.0.0.0", port=8050)
