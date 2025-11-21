@@ -587,10 +587,11 @@ def update_report(n_clicks, boroughs, years, vehicles, factors, injuries, search
 # ======================
 # Render / Deployment config
 # ======================
+# ---- Required for Railway / Gunicorn ----
 server = app.server
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8050))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8050)))
+
 
     
