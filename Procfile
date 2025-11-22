@@ -1,4 +1,3 @@
-web: gunicorn app:server
-
+web: gunicorn wsgi:application
 
 
